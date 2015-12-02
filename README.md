@@ -11,10 +11,13 @@ Ubuntu 12.04/14.04 are tested
 Role Variables
 --------------
 
-Software versions: 
+Software versions:
+
 - silk_ver
 - libfixbuf_ver
 - yaf_ver
+
+Other variables:
 
 - eth_device: ethernet device for SiLK to listen on
 - networks: list of cidrs to parse
