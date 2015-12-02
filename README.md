@@ -14,7 +14,7 @@ Role Variables
 Software versions: 
 - silk_ver
 - libfixbuf_ver
-- yaf_ver:
+- yaf_ver
 
 - eth_device: ethernet device for SiLK to listen on
 - networks: list of cidrs to parse
