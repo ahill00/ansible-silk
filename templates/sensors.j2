@@ -1,0 +1,16 @@
+probe S0 ipfix
+ listen-on-port 18001
+ protocol tcp
+ listen-as-host 127.0.0.1
+end probe
+group my-network
+ ipblocks {{ ansible_default_ipv4['address'] }}
+ {% for network in networks %}
+ ipblocks {{ network }} # other blocks you consider internal
+ {% endfor %}
+end group
+sensor S0
+ ipfix-probes S0
+ internal-ipblocks @my-network
+ external-ipblocks remainder
+end sensor

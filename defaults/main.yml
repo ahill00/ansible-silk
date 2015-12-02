@@ -1,0 +1,8 @@
+---
+# defaults file for ansible-silk
+silk_ver: '3.11.0.1'
+eth_device: 'eth0'
+libfixbuf_ver: '1.7.1'
+yaf_ver: '2.3.2'
+networks:
+  - 10.0.0.0/8

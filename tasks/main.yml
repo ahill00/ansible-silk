@@ -1,0 +1,112 @@
+---
+# tasks file for ansible-silk
+
+- name: install depedencies
+  apt: pkg={{ item }} state=present
+  with_items:
+    - libglib2.0-dev
+    - libpcap-dev
+    - python-dev
+  sudo: yes
+
+- name: ensure temp folder
+  file: state=directory
+        name=tmp
+
+- name: download NetSA software
+  get_url: url="{{ item }}"
+           dest=tmp
+  with_items:
+    - "http://tools.netsa.cert.org/releases/silk-{{ silk_ver }}.tar.gz"
+    - "http://tools.netsa.cert.org/releases/libfixbuf-{{ libfixbuf_ver }}.tar.gz"
+    - "http://tools.netsa.cert.org/releases/yaf-{{ yaf_ver }}.tar.gz"
+
+- name: extract tarballs
+  unarchive: src=/home/vagrant/tmp/{{ item.split('/')[-1] }} copy=no
+             dest=/home/vagrant/tmp/
+  with_items:
+    - "silk-{{ silk_ver }}.tar.gz"
+    - "libfixbuf-{{ libfixbuf_ver }}.tar.gz"
+    - "yaf-{{ yaf_ver }}.tar.gz"
+
+- name: compile fixbuf
+  command: ./configure chdir=/home/vagrant/tmp/libfixbuf-{{ libfixbuf_ver }}
+
+- name: make fixbuf
+  command: make chdir=/home/vagrant/tmp/libfixbuf-{{ libfixbuf_ver }}
+
+- name: install fixbuf
+  command: make install chdir=/home/vagrant/tmp/libfixbuf-{{ libfixbuf_ver }}
+  sudo: yes
+
+- name: compile YAF
+  environment:
+    PKG_CONFIG_PATH: /usr/local/lib/pkgconfig
+  command: ./configure --enable-applabel chdir=/home/vagrant/tmp/yaf-{{ yaf_ver }}
+
+- name: make YAF
+  command: make chdir=/home/vagrant/tmp/yaf-{{ yaf_ver }}
+
+- name: install YAF
+  command: make install chdir=/home/vagrant/tmp/yaf-{{ yaf_ver }}
+  sudo: yes
+
+- name: ensure silk data dir
+  file: state=directory path=/data
+  sudo: yes
+
+- name: compile silk
+  command: ./configure --with-libfixbuf=/usr/local/lib/pkgconfig
+                       --with-python --enable-ipv6
+           chdir=/home/vagrant/tmp/silk-{{ silk_ver }}
+
+- name: make silk
+  command: make chdir=/home/vagrant/tmp/silk-{{ silk_ver }}
+
+- name: install silk
+  command: make install chdir=/home/vagrant/tmp/silk-{{ silk_ver }}
+  sudo: yes
+
+- name: ensure silk LD configuration
+  copy: src=silk.conf dest=/etc/ld.so.conf.d/silk.conf
+  sudo: yes
+
+- name: update running ldconfig
+  command: ldconfig
+  sudo: yes
+
+- name: configure silk
+  command: cp /home/vagrant/tmp/silk-{{ silk_ver }}/site/twoway/silk.conf /data
+  sudo: yes
+
+- name: copy silk config
+  template: src=sensors.j2 dest=/data/sensors.conf
+  sudo: yes
+
+- name: copy rwflowpack config
+  copy: src=rwflowpack.conf dest=/usr/local/etc/
+  sudo: yes
+
+- name: copy rwflowpack init
+  file: dest=/etc/init.d/rwflowpack state=link src=/usr/local/share/silk/etc/init.d/rwflowpack
+  sudo: yes
+
+- name: set rwflowpack autostart
+  command: update-rc.d rwflowpack start 20 3 4 5 .
+  sudo: yes
+
+- name: start rwflowpack
+  service: name=rwflowpack state=started
+  sudo: yes
+
+- name: start YAF
+  shell: nohup /usr/local/bin/yaf --silk --ipfix=tcp --live=pcap  --out=127.0.0.1 --ipfix-port=18001 --in={{ eth_device }} --applabel --max-payload=384 &
+  sudo: yes
+
+- name: generate some traffic
+  command: ping -c 4 8.8.8.8
+
+
+- name: test query
+  shell: /usr/local/bin/rwfilter --sensor=S0 --proto=0-255 --pass=stdout --type=all | rwcut | tail
+
